@@ -15,6 +15,7 @@ export default function ProductsPage() {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -49,17 +50,23 @@ export default function ProductsPage() {
 
     if (uploadError) throw uploadError;
 
-    const { data: { publicUrl } } = supabaseBrowser.storage
+    const { data: publicData } = supabaseBrowser.storage
       .from('product-images')
       .getPublicUrl(filePath);
 
-    return publicUrl;
+    return publicData.publicUrl;
   };
 
   const addProduct = async () => {
     if (!name || !price) return alert('Name and price are required');
     setLoading(true);
-    const { data, error } = await supabaseBrowser.from('products').insert([{ name, price: parseFloat(price) }]).select().single();
+
+    const { data, error } = await supabaseBrowser
+      .from('products')
+      .insert([{ name, price: parseFloat(price) }])
+      .select()
+      .single();
+
     if (error) {
       setLoading(false);
       return alert(error.message);
@@ -69,7 +76,10 @@ export default function ProductsPage() {
     if (imageFile) {
       try {
         imageUrl = await uploadImage(imageFile, data.id);
-        await supabaseBrowser.from('products').update({ image_url: imageUrl }).eq('id', data.id);
+        await supabaseBrowser
+          .from('products')
+          .update({ image_url: imageUrl })
+          .eq('id', data.id);
       } catch (err: any) {
         alert('Image upload failed: ' + err.message);
       }
@@ -78,6 +88,7 @@ export default function ProductsPage() {
     setName('');
     setPrice('');
     setImageFile(null);
+    setPreviewUrl(null);
     setLoading(false);
     fetchProducts();
   };
@@ -91,6 +102,7 @@ export default function ProductsPage() {
     setEditingId(product.id);
     setName(product.name);
     setPrice(String(product.price));
+    setPreviewUrl(product.image_url || null);
   };
 
   const cancelEdit = () => {
@@ -98,24 +110,31 @@ export default function ProductsPage() {
     setName('');
     setPrice('');
     setImageFile(null);
+    setPreviewUrl(null);
   };
 
   const saveEdit = async () => {
     if (!editingId || !name || !price) return;
+    setLoading(true);
 
     let imageUrl = undefined;
     if (imageFile) {
       try {
         imageUrl = await uploadImage(imageFile, editingId);
       } catch (err: any) {
+        setLoading(false);
         return alert('Image upload failed: ' + err.message);
       }
     }
 
-    const updateData: any = { name, price: parseFloat(price) };
+    const updateData: any = {
+      name,
+      price: parseFloat(price),
+    };
     if (imageUrl) updateData.image_url = imageUrl;
 
     await supabaseBrowser.from('products').update(updateData).eq('id', editingId);
+    setLoading(false);
     cancelEdit();
     fetchProducts();
   };
@@ -154,13 +173,28 @@ export default function ProductsPage() {
         <input
           type="file"
           accept="image/*"
-          onChange={e => setImageFile(e.target.files?.[0] || null)}
+          onChange={e => {
+            const file = e.target.files?.[0] || null;
+            setImageFile(file);
+            if (file) {
+              setPreviewUrl(URL.createObjectURL(file));
+            } else {
+              setPreviewUrl(null);
+            }
+          }}
           className="border p-2"
         />
+        {previewUrl && (
+          <img
+            src={previewUrl}
+            alt="Preview"
+            className="w-16 h-16 object-cover rounded border"
+          />
+        )}
         {editingId ? (
           <>
-            <button onClick={saveEdit} className="bg-yellow-500 text-white px-4 py-2 rounded">
-              Save
+            <button onClick={saveEdit} disabled={loading} className="bg-yellow-500 text-white px-4 py-2 rounded">
+              {loading ? 'Saving...' : 'Save'}
             </button>
             <button onClick={cancelEdit} className="text-gray-600 hover:underline">
               Cancel
@@ -189,7 +223,14 @@ export default function ProductsPage() {
               <button onClick={() => startEdit(product)} className="text-blue-600 hover:underline">
                 Edit
               </button>
-              <button onClick={() => deleteProduct(product.id)} className="text-red-600 hover:underline">
+              <button
+                onClick={() => {
+                  if (confirm('Are you sure you want to delete this product?')) {
+                    deleteProduct(product.id);
+                  }
+                }}
+                className="text-red-600 hover:underline"
+              >
                 Delete
               </button>
             </div>
