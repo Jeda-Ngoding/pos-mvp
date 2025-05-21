@@ -1,5 +1,3 @@
-// app/dashboard/page.tsx
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -42,20 +40,22 @@ export default function DashboardPage() {
       .from('transactions')
       .select('*')
       .gte('created_at', startOfDay);
+
     setTotalTransactions(txToday?.length || 0);
     setTotalOmzet(txToday?.reduce((acc, t) => acc + Number(t.total), 0) || 0);
 
-    // top 3 products today
     const { data: itemsToday } = await supabase
       .from('transaction_items')
       .select(`product_id, quantity, product:products(name)`)
-      .in('transaction_id', txToday?.map(t => t.id));
+      .in('transaction_id', txToday ? txToday.map(t => t.id) : []);
+
     const map: Record<string, { name: string; total_quantity: number }> = {};
     itemsToday?.forEach(item => {
       const key = item.product_id;
       if (!map[key]) map[key] = { name: item.product.name, total_quantity: 0 };
       map[key].total_quantity += item.quantity;
     });
+
     setTopProducts(
       Object.entries(map)
         .map(([product_id, { name, total_quantity }]) => ({ product_id, name, total_quantity }))
@@ -132,7 +132,9 @@ export default function DashboardPage() {
           ) : (
             <ul>
               {topProducts.map(p => (
-                <li key={p.product_id}>{p.name} - {p.total_quantity} pcs</li>
+                <li key={p.product_id}>
+                  {p.name} - {p.total_quantity} pcs
+                </li>
               ))}
             </ul>
           )}
@@ -143,20 +145,47 @@ export default function DashboardPage() {
       <form onSubmit={handleFilter} className="mb-4 flex flex-wrap gap-4 items-end">
         <div>
           <label htmlFor="start" className="block mb-1 font-semibold">Start Date</label>
-          <input id="start" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="border rounded px-3 py-2" />
+          <input
+            id="start"
+            type="date"
+            value={startDate}
+            onChange={e => setStartDate(e.target.value)}
+            className="border rounded px-3 py-2"
+          />
         </div>
         <div>
           <label htmlFor="end" className="block mb-1 font-semibold">End Date</label>
-          <input id="end" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="border rounded px-3 py-2" />
+          <input
+            id="end"
+            type="date"
+            value={endDate}
+            onChange={e => setEndDate(e.target.value)}
+            className="border rounded px-3 py-2"
+          />
         </div>
-        <button type="submit" className="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700">Filter</button>
-        <button type="button" onClick={handleReset} className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400">Reset</button>
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700"
+        >
+          Filter
+        </button>
+        <button
+          type="button"
+          onClick={handleReset}
+          className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400"
+        >
+          Reset
+        </button>
       </form>
 
       {/* Transactions Table */}
-      {loading ? <p>Loading...</p> : (
+      {loading ? (
+        <p>Loading...</p>
+      ) : (
         <div>
-          {transactions.length === 0 ? <p className="text-gray-500">Tidak ada transaksi.</p> : (
+          {transactions.length === 0 ? (
+            <p className="text-gray-500">Tidak ada transaksi.</p>
+          ) : (
             <table className="w-full border-collapse border">
               <thead>
                 <tr className="bg-gray-200">
@@ -180,9 +209,23 @@ export default function DashboardPage() {
           {/* Pagination Controls */}
           {totalPages > 1 && (
             <div className="mt-4 flex justify-center items-center gap-4">
-              <button disabled={page === 1} onClick={() => setPage(prev => Math.max(prev-1,1))} className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50">Previous</button>
-              <span>Page {page} of {totalPages}</span>
-              <button disabled={page === totalPages} onClick={() => setPage(prev => Math.min(prev+1,totalPages))} className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50">Next</button>
+              <button
+                disabled={page === 1}
+                onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <span>
+                Page {page} of {totalPages}
+              </span>
+              <button
+                disabled={page === totalPages}
+                onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
+                className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
+              >
+                Next
+              </button>
             </div>
           )}
         </div>
