@@ -1,10 +1,5 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  experimental: {
-    appDir: true,
-    viewTransitions: true,
-  },
-};
+const nextConfig: NextConfig = {};
 
 export default nextConfig;
