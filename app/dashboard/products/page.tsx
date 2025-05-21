@@ -17,11 +17,26 @@ export default function ProductsPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const [isLastPage, setIsLastPage] = useState(false);
 
   const fetchProducts = async () => {
-    const { data, error } = await supabaseBrowser.from('products').select('*').order('created_at', { ascending: false });
-    if (!error) setProducts(data);
-    else alert(error.message);
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    const { data, error } = await supabaseBrowser
+      .from('products')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (!error && data) {
+      setProducts(data);
+      setIsLastPage(data.length < pageSize);
+    } else {
+      alert(error?.message);
+    }
   };
 
   const uploadImage = async (file: File, productId: string) => {
@@ -107,7 +122,15 @@ export default function ProductsPage() {
 
   useEffect(() => {
     fetchProducts();
-  }, []);
+  }, [page]);
+
+  const handlePrev = () => {
+    if (page > 1) setPage(prev => prev - 1);
+  };
+
+  const handleNext = () => {
+    if (!isLastPage) setPage(prev => prev + 1);
+  };
 
   return (
     <div>
@@ -173,6 +196,24 @@ export default function ProductsPage() {
           </li>
         ))}
       </ul>
+
+      <div className="flex justify-between items-center mt-6">
+        <button
+          onClick={handlePrev}
+          disabled={page === 1}
+          className="bg-gray-200 px-4 py-2 rounded disabled:opacity-50"
+        >
+          Previous
+        </button>
+        <span>Page {page}</span>
+        <button
+          onClick={handleNext}
+          disabled={isLastPage}
+          className="bg-gray-200 px-4 py-2 rounded disabled:opacity-50"
+        >
+          Next
+        </button>
+      </div>
     </div>
   );
 }

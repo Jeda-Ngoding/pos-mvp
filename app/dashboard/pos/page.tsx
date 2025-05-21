@@ -16,19 +16,35 @@ type CartItem = Product & {
 export default function POSPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(10); // Jumlah produk per halaman
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     const fetchProducts = async () => {
-      const { data, error } = await supabase.from('products').select();
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      const [{ data: productsData, error }, { count }] = await Promise.all([
+        supabase
+          .from('products')
+          .select('*', { count: 'exact' })
+          .range(from, to),
+        supabase
+          .from('products')
+          .select('*', { count: 'exact', head: true }),
+      ]);
+
       if (error) {
         console.error(error);
       } else {
-        setProducts(data);
+        setProducts(productsData || []);
+        setTotalPages(Math.ceil((count || 0) / pageSize));
       }
     };
 
     fetchProducts();
-  }, []);
+  }, [page, pageSize]);
 
   const addToCart = (product: Product) => {
     setCart(prev => {
@@ -59,14 +75,11 @@ export default function POSPage() {
 
   const decrementQty = (productId: number) => {
     setCart(prev =>
-      prev
-        .map(item =>
-          item.id === productId
-            ? { ...item, quantity: Math.max(1, item.quantity - 1) }
-            : item
-        )
-        // Jika ingin, bisa juga hapus jika quantity 0 (tapi minimal 1 diminta)
-        // .filter(item => item.quantity > 0)
+      prev.map(item =>
+        item.id === productId
+          ? { ...item, quantity: Math.max(1, item.quantity - 1) }
+          : item
+      )
     );
   };
 
@@ -80,7 +93,6 @@ export default function POSPage() {
       return;
     }
 
-    // Step 1: Insert transaction
     const { data: transactionData, error: transactionError } = await supabase
       .from('transactions')
       .insert([{ total: getTotal() }])
@@ -92,7 +104,6 @@ export default function POSPage() {
       return alert('Checkout gagal: ' + transactionError.message);
     }
 
-    // Step 2: Insert transaction_items
     const itemsToInsert = cart.map(item => ({
       transaction_id: transactionData.id,
       product_id: item.id,
@@ -142,6 +153,25 @@ export default function POSPage() {
               </li>
             ))}
           </ul>
+
+          {/* Pagination */}
+          <div className="flex items-center justify-between mt-4">
+            <button
+              onClick={() => setPage(prev => Math.max(1, prev - 1))}
+              disabled={page === 1}
+              className="bg-gray-300 px-3 py-1 rounded hover:bg-gray-400 disabled:opacity-50"
+            >
+              &larr; Prev
+            </button>
+            <span>Halaman {page} dari {totalPages}</span>
+            <button
+              onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={page === totalPages}
+              className="bg-gray-300 px-3 py-1 rounded hover:bg-gray-400 disabled:opacity-50"
+            >
+              Next &rarr;
+            </button>
+          </div>
         </div>
 
         {/* Cart */}
@@ -164,13 +194,10 @@ export default function POSPage() {
                       Rp{(item.price * item.quantity).toLocaleString()}
                     </p>
                   </div>
-
-                  {/* Qty Controls */}
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => decrementQty(item.id)}
                       className="bg-gray-300 px-2 rounded hover:bg-gray-400"
-                      aria-label={`Kurangi jumlah ${item.name}`}
                     >
                       -
                     </button>
@@ -178,14 +205,12 @@ export default function POSPage() {
                     <button
                       onClick={() => incrementQty(item.id)}
                       className="bg-gray-300 px-2 rounded hover:bg-gray-400"
-                      aria-label={`Tambah jumlah ${item.name}`}
                     >
                       +
                     </button>
                     <button
                       onClick={() => removeFromCart(item.id)}
                       className="text-red-500 hover:underline ml-4"
-                      aria-label={`Hapus ${item.name} dari keranjang`}
                     >
                       Hapus
                     </button>
@@ -195,7 +220,6 @@ export default function POSPage() {
             </ul>
           )}
 
-          {/* Total & Checkout */}
           <div className="mt-4">
             <p className="text-lg font-semibold">
               Total: Rp{getTotal().toLocaleString()}
