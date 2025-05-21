@@ -15,7 +15,6 @@ export default function ProductsPage() {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -50,17 +49,16 @@ export default function ProductsPage() {
 
     if (uploadError) throw uploadError;
 
-    const { data: publicData } = supabaseBrowser.storage
+    const { data: { publicUrl } } = supabaseBrowser.storage
       .from('product-images')
       .getPublicUrl(filePath);
 
-    return publicData.publicUrl;
+    return publicUrl;
   };
 
   const addProduct = async () => {
     if (!name || !price) return alert('Name and price are required');
     setLoading(true);
-
     const { data, error } = await supabaseBrowser
       .from('products')
       .insert([{ name, price: parseFloat(price) }])
@@ -80,15 +78,18 @@ export default function ProductsPage() {
           .from('products')
           .update({ image_url: imageUrl })
           .eq('id', data.id);
-      } catch (err: any) {
-        alert('Image upload failed: ' + err.message);
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          alert('Image upload failed: ' + err.message);
+        } else {
+          alert('Image upload failed');
+        }
       }
     }
 
     setName('');
     setPrice('');
     setImageFile(null);
-    setPreviewUrl(null);
     setLoading(false);
     fetchProducts();
   };
@@ -102,7 +103,6 @@ export default function ProductsPage() {
     setEditingId(product.id);
     setName(product.name);
     setPrice(String(product.price));
-    setPreviewUrl(product.image_url || null);
   };
 
   const cancelEdit = () => {
@@ -110,31 +110,28 @@ export default function ProductsPage() {
     setName('');
     setPrice('');
     setImageFile(null);
-    setPreviewUrl(null);
   };
 
   const saveEdit = async () => {
     if (!editingId || !name || !price) return;
-    setLoading(true);
 
     let imageUrl = undefined;
     if (imageFile) {
       try {
         imageUrl = await uploadImage(imageFile, editingId);
-      } catch (err: any) {
-        setLoading(false);
-        return alert('Image upload failed: ' + err.message);
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          return alert('Image upload failed: ' + err.message);
+        } else {
+          return alert('Image upload failed');
+        }
       }
     }
 
-    const updateData: any = {
-      name,
-      price: parseFloat(price),
-    };
+    const updateData: Partial<Product> = { name, price: parseFloat(price) };
     if (imageUrl) updateData.image_url = imageUrl;
 
     await supabaseBrowser.from('products').update(updateData).eq('id', editingId);
-    setLoading(false);
     cancelEdit();
     fetchProducts();
   };
@@ -144,11 +141,11 @@ export default function ProductsPage() {
   }, [page]);
 
   const handlePrev = () => {
-    if (page > 1) setPage(prev => prev - 1);
+    if (page > 1) setPage((prev) => prev - 1);
   };
 
   const handleNext = () => {
-    if (!isLastPage) setPage(prev => prev + 1);
+    if (!isLastPage) setPage((prev) => prev + 1);
   };
 
   return (
@@ -160,75 +157,78 @@ export default function ProductsPage() {
           type="text"
           placeholder="Product name"
           value={name}
-          onChange={e => setName(e.target.value)}
+          onChange={(e) => setName(e.target.value)}
           className="border p-2"
         />
         <input
           type="number"
           placeholder="Price"
           value={price}
-          onChange={e => setPrice(e.target.value)}
+          onChange={(e) => setPrice(e.target.value)}
           className="border p-2"
         />
         <input
           type="file"
           accept="image/*"
-          onChange={e => {
-            const file = e.target.files?.[0] || null;
-            setImageFile(file);
-            if (file) {
-              setPreviewUrl(URL.createObjectURL(file));
-            } else {
-              setPreviewUrl(null);
-            }
-          }}
+          onChange={(e) => setImageFile(e.target.files?.[0] || null)}
           className="border p-2"
         />
-        {previewUrl && (
-          <img
-            src={previewUrl}
-            alt="Preview"
-            className="w-16 h-16 object-cover rounded border"
-          />
-        )}
         {editingId ? (
           <>
-            <button onClick={saveEdit} disabled={loading} className="bg-yellow-500 text-white px-4 py-2 rounded">
-              {loading ? 'Saving...' : 'Save'}
+            <button
+              onClick={saveEdit}
+              className="bg-yellow-500 text-white px-4 py-2 rounded"
+            >
+              Save
             </button>
-            <button onClick={cancelEdit} className="text-gray-600 hover:underline">
+            <button
+              onClick={cancelEdit}
+              className="text-gray-600 hover:underline"
+            >
               Cancel
             </button>
           </>
         ) : (
-          <button onClick={addProduct} disabled={loading} className="bg-green-600 text-white px-4 py-2 rounded">
+          <button
+            onClick={addProduct}
+            disabled={loading}
+            className="bg-green-600 text-white px-4 py-2 rounded"
+          >
             {loading ? 'Adding...' : 'Add Product'}
           </button>
         )}
       </div>
 
       <ul className="space-y-3">
-        {products.map(product => (
-          <li key={product.id} className="border p-4 flex items-center justify-between gap-4">
+        {products.map((product) => (
+          <li
+            key={product.id}
+            className="border p-4 flex items-center justify-between gap-4"
+          >
             <div className="flex items-center gap-4">
               {product.image_url && (
-                <img src={product.image_url} alt={product.name} className="w-16 h-16 object-cover rounded" />
+                <img
+                  src={product.image_url}
+                  alt={product.name}
+                  className="w-16 h-16 object-cover rounded"
+                />
               )}
               <div>
                 <p className="font-semibold">{product.name}</p>
-                <p className="text-sm text-gray-600">Rp {product.price.toLocaleString()}</p>
+                <p className="text-sm text-gray-600">
+                  Rp {product.price.toLocaleString()}
+                </p>
               </div>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => startEdit(product)} className="text-blue-600 hover:underline">
+              <button
+                onClick={() => startEdit(product)}
+                className="text-blue-600 hover:underline"
+              >
                 Edit
               </button>
               <button
-                onClick={() => {
-                  if (confirm('Are you sure you want to delete this product?')) {
-                    deleteProduct(product.id);
-                  }
-                }}
+                onClick={() => deleteProduct(product.id)}
                 className="text-red-600 hover:underline"
               >
                 Delete
