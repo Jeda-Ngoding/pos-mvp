@@ -1,16 +1,22 @@
-import './globals.css';
-import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import Layout from '@/components/Layout';
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
-export const metadata: Metadata = {
-  title: 'POS App',
-};
+export default async function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const supabase = createServerComponentClient({ cookies });
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>
-        <div>{children}</div>
-      </body>
-    </html>
-  );
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    redirect('/login');
+  }
+
+  return <Layout>{children}</Layout>;
 }
