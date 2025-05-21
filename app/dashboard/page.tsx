@@ -57,8 +57,8 @@ export default function DashboardPage() {
 
       if (Array.isArray(item.product) && item.product.length > 0) {
         productName = item.product[0].name;
-      } else if (item.product && typeof item.product === "object") {
-        productName = item.product.name;
+      } else {
+        productName = ""; // or "Unknown Product"
       }
 
       if (!map[key]) map[key] = { name: productName, total_quantity: 0 };
